@@ -1,56 +1,71 @@
 # Swarm — 无人机群空间快照补位仿真
 
-中央电脑每个时间步发布"空间快照"（目标编队的空间分布），无人机群基于 **最近邻原则** 自动就近补位，形成目标编队。
+中央电脑每个时间步发布"空间快照"（目标编队的空间分布），无人机群基于 **最近邻原则** 自动就近补位，形成目标编队。支持 2D/3D、集中式/去中心化两种匹配模式。
 
 ## 核心算法
 
 ```
-t 时刻:
+t 时刻集中式:
   1. 在位检测 — 无人机当前位置是否已在目标像素上
   2. 空缺收集 — 收集所有未被填充的目标像素
   3. 距离优先贪心分配 — 按最近空缺距离升序排列，依次匹配
   4. 收敛 → 推进到 t+1
+
+t 时刻去中心化:
+  1. 在位检测 → 广播 CLAIM
+  2. 收集已声明空缺，未分配无人机找最近未声明空缺
+  3. 广播 CLAIM + 冲突解决（距离近者胜）
+  4. 渐进移动 → 收敛 → 推进到 t+1
 ```
 
 ## 项目结构
 
 ```
 src/
-├── grid.py          # 2D 空间网格 + 编队图案生成（矩形/圆/空心圆）
-├── drone.py         # 无人机个体
-├── matcher.py       # 最近邻贪心匹配（核心）
-└── simulation.py    # 主仿真循环
-tests/               # 对应单元测试
-docs/planning/       # 项目规划文档
+├── grid.py                # 空间网格 + 编队图案 (2D/3D)
+├── drone.py               # 无人机个体 (位置/移动/速度约束)
+├── matcher.py             # 集中式匹配（核心，维度自适应）
+├── simulation.py          # 主仿真循环（支持双模式）
+├── choreographer.py       # 动态快照序列生成器 (6种模式)
+├── visualizer.py          # matplotlib GIF 渲染 (2D/3D切片)
+├── comm.py                # 无人机通信网络
+└── distributed_matcher.py # 去中心化匹配算法
+tests/                     # 83 项单元测试
+docs/planning/             # 项目规划文档
 ```
 
 ## 快速开始
 
 ```bash
-# 安装依赖
-pip install numpy pytest
+pip install numpy pytest matplotlib
+python -m pytest tests/ -v   # 83 项测试
+```
 
-# 运行全部测试
-python -m pytest tests/ -v
-
-# 运行示例仿真
-python -c "
-from src.grid import create_snapshot_rectangle, create_snapshot_hollow_circle
+```python
+# 2D 集中式仿真 + GIF
+from src.choreographer import generate_sequence
 from src.simulation import run
+from src.visualizer import render_gif
 
-snapshots = [
-    create_snapshot_rectangle(40, 40, 10, 10, 8, 6),
-    create_snapshot_hollow_circle(40, 40, 30, 30, 5, 10),
-]
-trajectory = run(snapshots, n_drones=10, seed=42)
-"
+seq = generate_sequence(60, 60, 25, 'circle_shift', radius=6)
+traj = run(seq, n_drones=12, max_speed=2.5, seed=42)
+render_gif(traj, seq, 'swarm.gif', fps=6)
+```
+
+```python
+# 3D 去中心化仿真 + GIF
+from src.grid import create_snapshot_sphere
+
+seq = [create_snapshot_sphere(30, 40, 15, 10+i*2, 20, 8, 6) for i in range(20)]
+traj = run(seq, n_drones=25, max_speed=2.0, mode='distributed', comm_radius=20.0)
+render_gif(traj, seq, 'swarm3d.gif', fps=6, slice_z=8)
 ```
 
 ## 进度
 
 - [x] 里程碑 1：核心仿真引擎（grid / drone / matcher / simulation）
-- [ ] 里程碑 2：动态快照序列 + matplotlib 可视化
-- [ ] 里程碑 3：3D 扩展 + 通信模型
+- [x] 里程碑 2：动态快照序列 + matplotlib 可视化 + 速度约束
+- [x] 里程碑 3：3D 扩展 + 通信模型 + 去中心化
 - [ ] 里程碑 4：硬件接口（MAVLink / ROS）
 
 详见 `docs/planning/PROJECT_STATUS.md`
