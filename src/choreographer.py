@@ -24,6 +24,7 @@ from src.grid import (
     create_snapshot_rectangle,
     create_snapshot_circle,
     create_snapshot_hollow_circle,
+    create_snapshot_sphere,
 )
 
 
@@ -108,12 +109,57 @@ def _sequence_diagonal(
     return seq
 
 
+def _sequence_sphere_shift(
+    width: int, height: int, depth: int = 20, n_steps: int = 10,
+    start: tuple[int, int, int] = None, end: tuple[int, int, int] = None,
+    radius: int = 5
+) -> list[np.ndarray]:
+    """3D 球体编队从 start 平移到 end。"""
+    if start is None:
+        start = (radius + 2, height // 2, depth // 2)
+    if end is None:
+        end = (width - radius - 2, height // 2, depth // 2)
+    seq = []
+    for t in range(n_steps):
+        frac = t / max(n_steps - 1, 1)
+        cx = _lerp_int(start[0], end[0], frac)
+        cy = _lerp_int(start[1], end[1], frac)
+        cz = _lerp_int(start[2], end[2], frac)
+        seq.append(create_snapshot_sphere(width, height, depth, cx, cy, cz, radius))
+    return seq
+
+
+def _sequence_sphere_pulse(
+    width: int, height: int, depth: int = 20, n_steps: int = 10,
+    cx: int = None, cy: int = None, cz: int = None,
+    min_radius: int = 3, max_radius: int = 10, cycles: float = 1.0
+) -> list[np.ndarray]:
+    """3D 球体呼吸缩放。"""
+    if cx is None:
+        cx = width // 2
+    if cy is None:
+        cy = height // 2
+    if cz is None:
+        cz = depth // 2
+    seq = []
+    for t in range(n_steps):
+        frac = t / max(n_steps - 1, 1)
+        phase = frac * 2.0 * np.pi * cycles
+        mid = (min_radius + max_radius) / 2.0
+        amp = (max_radius - min_radius) / 2.0
+        r = int(round(mid + amp * np.sin(phase)))
+        seq.append(create_snapshot_sphere(width, height, depth, cx, cy, cz, r))
+    return seq
+
+
 # 模式注册表
 _PATTERNS = {
     "line_sweep": _sequence_line_sweep,
     "circle_shift": _sequence_circle_shift,
     "pulse": _sequence_pulse,
     "diagonal": _sequence_diagonal,
+    "sphere_shift": _sequence_sphere_shift,
+    "sphere_pulse": _sequence_sphere_pulse,
 }
 
 

@@ -2,36 +2,39 @@
 
 ## 当前阶段
 
-**里程碑 2: 动态快照 + 基础可视化** — 已实现。
+**里程碑 3: 三维扩展 + 通信模型 + 去中心化** — 已实现。
 
 ## 已完成
 
 ### 里程碑 1: 核心仿真引擎
-- [x] `src/grid.py` — 2D 空间网格 + 快照生成（矩形、圆形、空心圆、自定义点位）
-- [x] `src/drone.py` — 无人机个体（ID、位置、距离计算、瞬时移动、速度约束）
-- [x] `src/matcher.py` — 最近邻贪心匹配算法（在位检测 → 空缺收集 → 距离优先分配）
-- [x] `src/simulation.py` — 主仿真循环（多步推进、轨迹记录、内层收敛循环）
-- [x] 对应测试套件
+- [x] grid / drone / matcher / simulation + 测试
 
 ### 里程碑 2: 动态快照 + 基础可视化
-- [x] `src/choreographer.py` — 动态快照序列生成（line_sweep / circle_shift / pulse / diagonal）
-- [x] `src/visualizer.py` — matplotlib GIF 渲染（目标像素 + 无人机点 + 编号 + 时间戳）
-- [x] Drone 添加 `max_speed` 属性和 `move_toward()` 方法（保留 `move_to()`）
-- [x] Simulation 添加内层收敛循环，支持速度约束模式
-- [x] 全部 55 项测试通过
+- [x] choreographer.py / visualizer.py + 速度约束 + 内层收敛
+
+### 里程碑 3: 三维扩展 + 通信模型 + 去中心化
+- [x] `src/drone.py` — 位置改为 (x, y, z) 三元组，所有方法支持 z 轴
+- [x] `src/matcher.py` — 维度通用化（_sq_dist + 可变长元组处理），2D/3D 自动适配
+- [x] `src/grid.py` — 新增 create_snapshot_box / create_snapshot_sphere (3D)
+- [x] `src/comm.py` — 通信网络模块（消息广播/接收，通信半径限制）
+- [x] `src/distributed_matcher.py` — 去中心化匹配（声明 + 冲突解决 + 收敛）
+- [x] `src/simulation.py` — 新增 mode="distributed" + comm_radius 参数
+- [x] `src/choreographer.py` — 新增 sphere_shift / sphere_pulse 3D 模式
+- [x] `src/visualizer.py` — 3D 切片投影渲染（slice_z 参数）
+- [x] 全部 83 项测试通过
 
 ## 下一步
 
-- 里程碑 3 规划：3D 扩展 + 通信模型
+- 里程碑 4 规划：硬件接口（MAVLink / ROS）
 - 当前可执行 `python -m pytest tests/ -v` 验证全部测试
-- 运行示例仿真并生成 GIF：
+- 3D 端到端示例：
   ```python
-  from src.choreographer import generate_sequence
+  from src.grid import create_snapshot_sphere
   from src.simulation import run
   from src.visualizer import render_gif
-  seq = generate_sequence(60, 60, 25, 'circle_shift', radius=6)
-  traj = run(seq, n_drones=12, max_speed=2.5, seed=42)
-  render_gif(traj, seq, 'swarm_demo.gif', fps=6)
+  seq = [create_snapshot_sphere(30, 40, 15, 10+i*2, 20, 8, 6) for i in range(20)]
+  traj = run(seq, n_drones=25, max_speed=2.0, mode='distributed', comm_radius=20.0)
+  render_gif(traj, seq, 'swarm3d.gif', fps=6, slice_z=8)
   ```
 
 ## 风险

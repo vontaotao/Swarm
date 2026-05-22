@@ -98,16 +98,62 @@ def create_snapshot_custom(width: int, height: int, points: list[tuple[int, int]
     return grid
 
 
+def create_snapshot_box(
+    width: int, height: int, depth: int,
+    cx: int, cy: int, cz: int,
+    box_w: int, box_h: int, box_d: int,
+) -> np.ndarray:
+    """生成 3D 长方体编队快照。
+
+    Args:
+        width, height, depth: 网格尺寸
+        cx, cy, cz: 长方体中心坐标
+        box_w, box_h, box_d: 长方体宽高深
+    """
+    grid = np.zeros((depth, height, width), dtype=bool)
+    x0 = max(0, cx - box_w // 2)
+    y0 = max(0, cy - box_h // 2)
+    z0 = max(0, cz - box_d // 2)
+    x1 = min(width, cx + box_w // 2)
+    y1 = min(height, cy + box_h // 2)
+    z1 = min(depth, cz + box_d // 2)
+    grid[z0:z1, y0:y1, x0:x1] = True
+    return grid
+
+
+def create_snapshot_sphere(
+    width: int, height: int, depth: int,
+    cx: int, cy: int, cz: int, radius: int,
+) -> np.ndarray:
+    """生成 3D 球体编队快照。
+
+    Args:
+        width, height, depth: 网格尺寸
+        cx, cy, cz: 球心坐标
+        radius: 半径（像素）
+    """
+    grid = np.zeros((depth, height, width), dtype=bool)
+    zz, yy, xx = np.ogrid[:depth, :height, :width]
+    dist = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2 + (zz - cz) ** 2)
+    grid[dist <= radius] = True
+    return grid
+
+
 def count_target_cells(grid: np.ndarray) -> int:
     """统计快照中需要填充的目标像素数。"""
     return int(np.sum(grid))
 
 
-def get_target_positions(grid: np.ndarray) -> list[tuple[int, int]]:
+def get_target_positions(grid: np.ndarray) -> list[tuple[int, ...]]:
     """提取快照中所有目标像素的坐标列表。
 
     Returns:
-        [(x1, y1), (x2, y2), ...]，按行优先排列
+        坐标列表，维度自动适配。2D: [(x, y), ...], 3D: [(x, y, z), ...]
     """
-    ys, xs = np.where(grid)
-    return list(zip(xs, ys))
+    idx_arrays = np.where(grid)
+    n_cells = len(idx_arrays[0])
+    positions = []
+    for i in range(n_cells):
+        coord = tuple(int(idx_arrays[d][i]) for d in reversed(range(len(idx_arrays))))
+        positions.append(coord)
+    return positions

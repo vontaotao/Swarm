@@ -114,7 +114,41 @@ class TestMatchRoundToPixel:
         """无人机位置浮点化后四舍五入匹配像素。"""
         grid = np.zeros((10, 10), dtype=bool)
         grid[3, 3] = True
-        # 无人机在 (3.2, 2.8)，四舍五入为 (3, 3) 像素
         positions = [(3.2, 2.8)]
         result = match(grid, positions)
         assert result == [(3.0, 3.0)]
+
+
+class TestMatch3D:
+    def test_3d_one_drone_one_vacancy(self):
+        """3D 快照 + 3D 位置 → 3D 分配。"""
+        grid = np.zeros((5, 10, 10), dtype=bool)  # (depth, height, width)
+        grid[2, 5, 7] = True  # 目标 (7, 5, 2)
+        positions = [(0.0, 0.0, 0.0)]
+        result = match(grid, positions)
+        assert result == [(7.0, 5.0, 2.0)]
+
+    def test_3d_already_in_position(self):
+        grid = np.zeros((5, 10, 10), dtype=bool)
+        grid[2, 3, 3] = True
+        grid[4, 7, 8] = True
+        positions = [(3.0, 3.0, 2.0), (8.0, 7.0, 4.0)]
+        result = match(grid, positions)
+        assert len(result) == 2
+        assert (3.0, 3.0, 2.0) in result
+        assert (8.0, 7.0, 4.0) in result
+
+    def test_3d_assignment_priority(self):
+        """3D 下距离优先仍然正确 — 更近的无人机优先分配。"""
+        grid = np.zeros((10, 20, 20), dtype=bool)
+        grid[5, 5, 5] = True    # 目标 (5, 5, 5)
+        grid[5, 5, 15] = True   # 目标 (15, 5, 5)
+        # drone_0 在原点，距 (5,5,5) 近
+        # drone_1 在 (10,0,0)，距 (15,5,5) 近但竞品到 (5,5,5) 也近
+        positions = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0)]
+        result = match(grid, positions)
+        # drone_0: 到 (5,5,5) 距离 ≈8.66, 到 (15,5,5) ≈16.1 → 最近空缺 ≈8.66
+        # drone_1: 到 (5,5,5) 距离 ≈7.07, 到 (15,5,5) ≈7.07 → 最近空缺 ≈7.07
+        # drone_1 更近 → 优先分配
+        assert result[1] == (15.0, 5.0, 5.0)
+        assert result[0] == (5.0, 5.0, 5.0)

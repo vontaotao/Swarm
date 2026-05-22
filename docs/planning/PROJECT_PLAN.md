@@ -19,11 +19,11 @@
 - [x] 使用 matplotlib 生成 GIF 动画 — `src/visualizer.py`
 - [x] 无人机运动学约束（速度上限）— `drone.move_toward()` + 内层收敛循环
 
-### 里程碑 3: 三维扩展 + 通信模型（规划中）
+### 里程碑 3: 三维扩展 + 通信模型 + 去中心化（已完成）
 
-- 3D 空间仿真
-- 无人机间点对点通信
-- 分布式/"无中央协调"变体
+- [x] 3D 空间仿真 — drone/matcher/grid 维度通用化
+- [x] 无人机间点对点通信 — `src/comm.py`
+- [x] 分布式/"无中央协调"变体 — `src/distributed_matcher.py`
 
 ### 里程碑 4: 硬件接口（远期）
 

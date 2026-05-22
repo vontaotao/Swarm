@@ -22,6 +22,8 @@ from src.grid import (
     create_snapshot_circle,
     create_snapshot_hollow_circle,
     create_snapshot_custom,
+    create_snapshot_box,
+    create_snapshot_sphere,
     count_target_cells,
     get_target_positions,
 )
@@ -100,3 +102,35 @@ class TestHelpers:
         assert (3, 2) in positions
         assert (5, 5) in positions
         assert len(positions) == 2
+
+    def test_get_target_positions_3d(self):
+        grid = np.zeros((5, 10, 10), dtype=bool)
+        grid[2, 3, 4] = True
+        positions = get_target_positions(grid)
+        assert (4, 3, 2) in positions
+        assert len(positions) == 1
+
+
+class TestSnapshotBox:
+    def test_basic_box(self):
+        grid = create_snapshot_box(20, 20, 10, 10, 10, 5, 4, 4, 2)
+        assert grid.shape == (10, 20, 20)
+        assert grid.dtype == bool
+        assert count_target_cells(grid) > 0
+
+    def test_box_clipped(self):
+        grid = create_snapshot_box(10, 10, 5, 0, 0, 0, 6, 6, 4)
+        # 裁剪后 (0,0,0) 到 (2,2,1) = 3*3*2 = 18
+        assert count_target_cells(grid) == 18
+
+
+class TestSnapshotSphere:
+    def test_basic_sphere(self):
+        grid = create_snapshot_sphere(20, 20, 10, 10, 10, 5, 5)
+        assert grid.shape == (10, 20, 20)
+        assert grid[5, 10, 10] is np.True_  # 球心
+        assert count_target_cells(grid) > 0
+
+    def test_sphere_corner_empty(self):
+        grid = create_snapshot_sphere(20, 20, 10, 10, 10, 5, 5)
+        assert grid[0, 0, 0] is np.False_

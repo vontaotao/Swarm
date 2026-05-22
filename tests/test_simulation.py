@@ -64,19 +64,18 @@ class TestRunMultiStep:
         assert len(trajectory) == 3
         for step in trajectory:
             assert len(step) == 20
-            for x, y in step:
-                # 位置应在网格范围内
+            for x, y, z in step:
                 assert 0.0 <= x < 30.0
                 assert 0.0 <= y < 30.0
+                assert z == 0.0
 
     def test_all_drones_reach_targets(self):
         """当目标像素足够多时，所有无人机都应到达目标位置。"""
         snapshot = create_snapshot_rectangle(50, 50, 25, 25, 20, 20)  # 400 个目标
         snapshots = [snapshot] * 3  # 静态快照，多次迭代
         trajectory = run(snapshots, n_drones=30, seed=0, verbose=False)
-        # 第一步后所有 30 架都应就位（400 > 30）
         final = trajectory[-1]
-        for x, y in final:
+        for x, y, z in final:
             ix, iy = int(round(x)), int(round(y))
             assert snapshot[iy, ix] is np.True_
 
@@ -92,7 +91,7 @@ class TestRunWithSpeedLimit:
         traj_default = run(snapshots, n_drones=10, seed=42, verbose=False)
         assert len(traj_inf) == len(traj_default)
         for step_a, step_b in zip(traj_inf, traj_default):
-            for (xa, ya), (xb, yb) in zip(step_a, step_b):
+            for (xa, ya, za), (xb, yb, zb) in zip(step_a, step_b):
                 assert xa == xb
                 assert ya == yb
 
@@ -102,7 +101,7 @@ class TestRunWithSpeedLimit:
         snapshots = [snapshot] * 3
         trajectory = run(snapshots, n_drones=8, seed=7, max_speed=2.0, verbose=False)
         final = trajectory[-1]
-        for x, y in final:
+        for x, y, z in final:
             ix, iy = int(round(x)), int(round(y))
             assert snapshot[iy, ix] is np.True_
 
@@ -116,6 +115,39 @@ class TestRunWithSpeedLimit:
         assert len(trajectory) == 2
         for step in trajectory:
             assert len(step) == 6
-            for x, y in step:
+            for x, y, z in step:
                 assert 0.0 <= x < 20.0
                 assert 0.0 <= y < 20.0
+
+
+class TestRunDistributed:
+    def test_distributed_mode_basic(self):
+        """去中心化模式基本收敛。"""
+        snapshot = create_snapshot_rectangle(30, 30, 10, 10, 6, 6)
+        trajectory = run([snapshot], n_drones=5, seed=42,
+                         max_speed=3.0, mode="distributed", comm_radius=20.0, verbose=False)
+        assert len(trajectory) == 1
+        assert len(trajectory[0]) == 5
+
+    def test_distributed_multi_step(self):
+        snapshots = [
+            create_snapshot_rectangle(30, 30, 5, 5, 4, 4),
+            create_snapshot_rectangle(30, 30, 25, 25, 4, 4),
+        ]
+        trajectory = run(snapshots, n_drones=8, seed=99,
+                         max_speed=float("inf"), mode="distributed", comm_radius=50.0, verbose=False)
+        assert len(trajectory) == 2
+        for step in trajectory:
+            assert len(step) == 8
+
+    def test_distributed_3d(self):
+        from src.grid import create_snapshot_sphere
+        snapshot = create_snapshot_sphere(20, 20, 10, 10, 10, 5, 4)
+        trajectory = run([snapshot], n_drones=4, seed=1,
+                         max_speed=float("inf"), mode="distributed", comm_radius=30.0, verbose=False)
+        assert len(trajectory) == 1
+        # 所有无人机应到达球体内
+        snapshot = snapshot
+        for x, y, z in trajectory[0]:
+            ix, iy, iz = int(round(x)), int(round(y)), int(round(z))
+            assert snapshot[iz, iy, ix] is np.True_
