@@ -79,3 +79,43 @@ class TestRunMultiStep:
         for x, y in final:
             ix, iy = int(round(x)), int(round(y))
             assert snapshot[iy, ix] is np.True_
+
+
+class TestRunWithSpeedLimit:
+    def test_max_speed_infinite_behavior_same(self):
+        """max_speed=inf 应与原始行为一致（瞬时到达）。"""
+        snapshots = [
+            create_snapshot_rectangle(30, 30, 10, 10, 6, 6),
+            create_snapshot_rectangle(30, 30, 20, 20, 6, 6),
+        ]
+        traj_inf = run(snapshots, n_drones=10, seed=42, max_speed=float("inf"), verbose=False)
+        traj_default = run(snapshots, n_drones=10, seed=42, verbose=False)
+        assert len(traj_inf) == len(traj_default)
+        for step_a, step_b in zip(traj_inf, traj_default):
+            for (xa, ya), (xb, yb) in zip(step_a, step_b):
+                assert xa == xb
+                assert ya == yb
+
+    def test_speed_limit_does_not_break_convergence(self):
+        """速度有限时，静态快照下最终仍应收敛。"""
+        snapshot = create_snapshot_rectangle(40, 40, 20, 20, 10, 8)
+        snapshots = [snapshot] * 3
+        trajectory = run(snapshots, n_drones=8, seed=7, max_speed=2.0, verbose=False)
+        final = trajectory[-1]
+        for x, y in final:
+            ix, iy = int(round(x)), int(round(y))
+            assert snapshot[iy, ix] is np.True_
+
+    def test_speed_limit_produces_trajectory(self):
+        """速度有限时轨迹维度正确。"""
+        snapshots = [
+            create_snapshot_rectangle(20, 20, 5, 5, 4, 4),
+            create_snapshot_rectangle(20, 20, 15, 15, 4, 4),
+        ]
+        trajectory = run(snapshots, n_drones=6, seed=99, max_speed=3.0, verbose=False)
+        assert len(trajectory) == 2
+        for step in trajectory:
+            assert len(step) == 6
+            for x, y in step:
+                assert 0.0 <= x < 20.0
+                assert 0.0 <= y < 20.0

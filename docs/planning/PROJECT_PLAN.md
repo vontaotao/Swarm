@@ -13,11 +13,11 @@
 - 模块：grid / drone / matcher / simulation + 单元测试
 - 详见 `goals/001-core-simulation.md`
 
-### 里程碑 2: 动态快照 + 基础可视化（计划中）
+### 里程碑 2: 动态快照 + 基础可视化（已完成）
 
-- 快照序列化（随时间变化）
-- 使用 matplotlib 生成 GIF 动画
-- 无人机运动学约束（速度上限）
+- [x] 快照序列化（随时间变化）— `src/choreographer.py`
+- [x] 使用 matplotlib 生成 GIF 动画 — `src/visualizer.py`
+- [x] 无人机运动学约束（速度上限）— `drone.move_toward()` + 内层收敛循环
 
 ### 里程碑 3: 三维扩展 + 通信模型（规划中）
 
