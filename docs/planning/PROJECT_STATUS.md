@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-**里程碑 4: 轻量动力学 + 碰撞检测 + 硬件抽象** — 已实现。
+**里程碑 5: 工程质量夯实** — 已完成。
 
 ## 已完成
 
@@ -32,10 +32,18 @@
 - [x] `src/distributed_matcher.py` — 支持物理模式和碰撞规避
 - [x] 全部 124 项测试通过
 
+### 里程碑 5: 工程质量夯实
+- [x] `src/physics.py` — config-first 优先级规则修复
+- [x] `src/simulation.py` — max_sub_steps / max_rounds 暴露为可配置参数 + 超时警告
+- [x] `src/distributed_matcher.py` — 删除硬编码常量 + verbose 参数 + 超时警告
+- [x] `src/visualizer.py` — slice_z bounds check
+- [x] 新增 15 项测试 (124 → 139)：优先级验证、边界情况、参数验证、3D 渲染防御
+- [x] 全部 139 项测试通过
+
 ## 下一步
 
-- 里程碑 5：待规划
-- 当前可执行 `python -m pytest tests/ -v` 验证全部测试（124 项）
+- 里程碑 6：待规划
+- 当前可执行 `python -m pytest tests/ -v` 验证全部测试（139 项）
 - 物理模式端到端示例：
   ```python
   from src.choreographer import generate_sequence

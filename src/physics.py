@@ -42,11 +42,11 @@ def physics_step(drone: object, tx: float, ty: float, tz: float,
     """单步欧拉积分，向目标移动。返回是否到达目标。
 
     直接修改 drone 的 x/y/z 和 vx/vy/vz 属性。
-    使用 config 中的参数，物理参数优先用 drone 自身值（若不为默认值）。
+    物理参数：config 中显式传入的值优先，否则使用 drone 自身的持久属性。
     """
-    mass = drone.mass if drone.mass != 1.0 else config.mass
-    max_accel = drone.max_accel if drone.max_accel != float("inf") else config.max_accel
-    drag = drone.drag if drone.drag != 0.0 else config.drag
+    mass = config.mass if config.mass != 1.0 else drone.mass
+    max_accel = config.max_accel if config.max_accel != float("inf") else drone.max_accel
+    drag = config.drag if config.drag != 0.0 else drone.drag
     dt = config.dt
 
     px, py, pz = drone.position

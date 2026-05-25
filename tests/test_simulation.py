@@ -226,3 +226,36 @@ class TestRunWithCollision:
         for x, y, z in final:
             ix, iy = int(round(x)), int(round(y))
             assert snapshot[iy, ix] is np.True_
+
+
+class TestRunMaxSteps:
+    def test_max_sub_steps_custom(self):
+        """自定义 max_sub_steps 不崩溃且轨迹正确。"""
+        snapshot = create_snapshot_rectangle(20, 20, 5, 5, 4, 4)
+        snapshots = [
+            snapshot,
+            create_snapshot_rectangle(20, 20, 15, 15, 4, 4),
+        ]
+        trajectory = run(snapshots, n_drones=6, seed=42, max_speed=2.0,
+                         max_sub_steps=5, verbose=False)
+        assert len(trajectory) == 2
+        for step in trajectory:
+            assert len(step) == 6
+
+    def test_max_rounds_custom_distributed(self):
+        """分布式模式下自定义 max_rounds 不崩溃。"""
+        snapshot = create_snapshot_rectangle(20, 20, 5, 5, 4, 4)
+        trajectory = run([snapshot], n_drones=4, seed=1,
+                         max_speed=3.0, mode="distributed", comm_radius=30.0,
+                         max_rounds=5, verbose=False)
+        assert len(trajectory) == 1
+        assert len(trajectory[0]) == 4
+
+    def test_all_true_grid_converges(self):
+        """全 True 网格 (20x20) x 10 架无人机收敛。"""
+        snapshot = np.ones((20, 20), dtype=bool)
+        trajectory = run([snapshot], n_drones=10, seed=0, verbose=False)
+        assert len(trajectory) == 1
+        for x, y, z in trajectory[0]:
+            assert 0.0 <= x < 20.0
+            assert 0.0 <= y < 20.0

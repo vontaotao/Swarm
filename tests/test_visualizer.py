@@ -20,7 +20,7 @@ import tempfile
 import numpy as np
 import pytest
 from src.visualizer import render_gif
-from src.grid import create_snapshot_rectangle
+from src.grid import create_snapshot_rectangle, create_snapshot_sphere
 
 
 class TestRenderGif:
@@ -64,3 +64,20 @@ class TestRenderGif:
     def test_empty_input_raises(self):
         with pytest.raises(ValueError):
             render_gif([], [], self._tmp_path())
+
+    def test_3d_basic_rendering(self):
+        """3D 快照 + 3D 轨迹生成 GIF。"""
+        snapshot = create_snapshot_sphere(20, 20, 10, 10, 10, 5, 5)
+        trajectory = [[(10.0, 10.0, 5.0), (8.0, 12.0, 4.0)]]
+        out = self._tmp_path()
+        result = render_gif(trajectory, [snapshot], out, fps=5)
+        assert result == out
+        assert os.path.exists(out)
+        assert os.path.getsize(out) > 0
+
+    def test_slice_z_out_of_bounds_raises(self):
+        """slice_z 越界抛出 ValueError。"""
+        snapshot = create_snapshot_sphere(20, 20, 10, 10, 10, 5, 5)
+        trajectory = [[(10.0, 10.0, 5.0)]]
+        with pytest.raises(ValueError):
+            render_gif(trajectory, [snapshot], self._tmp_path(), slice_z=99)

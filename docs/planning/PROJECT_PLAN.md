@@ -34,4 +34,10 @@
 - [x] 零外部依赖，全部新参数有默认值
 - 详见 `goals/004-physics-hardware.md`
 
-### 里程碑 5: 待规划
+### 里程碑 5: 工程质量夯实（已完成）
+
+- [x] physics.py config-first 优先级修复
+- [x] simulation.py / distributed_matcher.py 硬编码常量暴露为参数 + 超时警告
+- [x] visualizer.py slice_z bounds check
+- [x] 测试覆盖 124 → 139 项（+15 项边界/优先级/防御测试）
+- 详见 `goals/005-quality-consolidation.md`

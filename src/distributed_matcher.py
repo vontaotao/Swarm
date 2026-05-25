@@ -40,14 +40,13 @@ from src.matcher import _vacancies_from_snapshot, _pixel_at, _sq_dist
 from src.physics import PhysicsConfig, physics_step
 from src.collision import avoid_collisions
 
-_MAX_ROUNDS = 100
-
 
 def distributed_match(
     snapshot: np.ndarray,
     drones: list[Drone],
     comm: CommNetwork,
-    max_rounds: int = _MAX_ROUNDS,
+    max_rounds: int = 100,
+    verbose: bool = True,
     use_physics: bool = False,
     physics_dt: float = 0.1,
     max_accel: float = float("inf"),
@@ -65,10 +64,14 @@ def distributed_match(
         drones: 无人机列表
         comm: 已初始化的通信网络
         max_rounds: 最大协商轮数
+        verbose: 是否打印超时警告
         use_physics: 是否启用动力学引擎
         physics_dt: 物理时间步长
         max_accel: 最大加速度
         drag: 阻力系数
+        collision_avoidance: 是否启用碰撞规避
+        min_distance: 最小安全距离
+        repulsion_strength: 排斥力强度
     """
     n = len(drones)
     if n == 0:
@@ -210,6 +213,9 @@ def distributed_match(
                         break
             if all_arrived:
                 break
+    else:
+        if verbose:
+            print(f"  [警告] 分布式协商轮数耗尽 max_rounds={max_rounds}，未收敛")
 
 
 def _drone_by_id(drones: list[Drone], drone_id: int) -> Drone:

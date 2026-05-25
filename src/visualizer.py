@@ -58,6 +58,8 @@ def render_gif(
         depth, height, width = snapshots[0].shape
         if slice_z is None:
             slice_z = depth // 2
+        elif slice_z < 0 or slice_z >= depth:
+            raise ValueError(f"slice_z={slice_z} 超出范围 [0, {depth - 1}]")
     else:
         height, width = snapshots[0].shape
         depth = 0

@@ -124,6 +124,22 @@ class TestSnapshotBox:
         assert count_target_cells(grid) == 18
 
 
+class TestSnapshotNegativeCenter:
+    def test_rectangle_negative_center(self):
+        """create_snapshot_rectangle 负中心不崩溃。"""
+        grid = create_snapshot_rectangle(100, 100, -10, -10, 20, 20)
+        assert grid.shape == (100, 100)
+        assert grid.dtype == bool
+        # 负中心部分被裁剪
+        assert count_target_cells(grid) >= 0
+
+    def test_circle_negative_center(self):
+        """create_snapshot_circle 负中心不崩溃。"""
+        grid = create_snapshot_circle(100, 100, -5, -5, 10)
+        assert grid.shape == (100, 100)
+        assert count_target_cells(grid) >= 0
+
+
 class TestSnapshotSphere:
     def test_basic_sphere(self):
         grid = create_snapshot_sphere(20, 20, 10, 10, 10, 5, 5)

@@ -90,3 +90,13 @@ class TestDistributedMatch:
         comm = CommNetwork(comm_radius=30.0)
         distributed_match(snapshot, drones, comm, max_rounds=50)
         assert _all_drones_on_target(drones, snapshot)
+
+    def test_empty_snapshot_3d(self):
+        """3D 全 False 快照不崩溃，无人机位置不变。"""
+        snapshot = np.zeros((10, 20, 20), dtype=bool)
+        drones = [Drone(0, 5.0, 5.0, 3.0), Drone(1, 15.0, 10.0, 7.0)]
+        original_positions = [d.position for d in drones]
+        comm = CommNetwork(comm_radius=30.0)
+        distributed_match(snapshot, drones, comm, max_rounds=20)
+        for d, orig in zip(drones, original_positions):
+            assert d.position == orig

@@ -18,6 +18,8 @@
 - physics_dt: 物理时间步长
 - max_accel: 最大加速度
 - drag: 阻力系数
+- max_sub_steps: 集中式内层最大子步数
+- max_rounds: 分布式协商最大轮数
 
 # 3. 输出
 - trajectory: list[list[(x, y, z)]]
@@ -43,8 +45,6 @@ from src.comm import CommNetwork
 from src.distributed_matcher import distributed_match
 from src.physics import PhysicsConfig, physics_step
 from src.collision import avoid_collisions
-
-_MAX_SUB_STEPS = 200
 
 
 def _init_drones(
@@ -93,6 +93,8 @@ def run(
     collision_avoidance: bool = False,
     min_distance: float = 1.0,
     repulsion_strength: float = 1.0,
+    max_sub_steps: int = 200,
+    max_rounds: int = 100,
 ) -> list[list[tuple[float, float, float]]]:
     """运行多时间步仿真。
 
@@ -111,6 +113,8 @@ def run(
         collision_avoidance: 是否启用碰撞规避
         min_distance: 最小安全距离
         repulsion_strength: 排斥力强度
+        max_sub_steps: 集中式内层收敛最大子步数
+        max_rounds: 分布式协商最大轮数
 
     Returns:
         trajectory[t][i] = 第 t 步第 i 架无人机的 (x, y, z)
@@ -131,7 +135,7 @@ def run(
     for t, snapshot in enumerate(snapshots):
         if mode == "centralized":
             # --- 集中式：matcher + 内层收敛 ---
-            for _sub_step in range(_MAX_SUB_STEPS):
+            for _sub_step in range(max_sub_steps):
                 positions = [d.position for d in drones]
                 targets = match(snapshot, positions)
 
@@ -152,9 +156,13 @@ def run(
 
                 if not any_moving:
                     break
+            else:
+                if verbose:
+                    print(f"  [警告] 集中式内层循环耗尽 max_sub_steps={max_sub_steps}，未收敛")
         else:
             # --- 去中心化：通信协商 ---
             distributed_match(snapshot, drones, comm,
+                              max_rounds=max_rounds, verbose=verbose,
                               use_physics=use_physics, physics_dt=physics_dt,
                               max_accel=max_accel, drag=drag,
                               collision_avoidance=collision_avoidance,

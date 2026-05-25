@@ -125,3 +125,59 @@ class TestPhysicsConvergence:
             physics_step(d, 100.0, 0.0, 0.0, cfg)
             speed = math.sqrt(d.vx * d.vx + d.vy * d.vy + d.vz * d.vz)
             assert speed <= 3.0 + 1e-9
+
+
+class TestPhysicsPriority:
+    """验证 physics_step 中 config 优先、drone 回退的规则。"""
+
+    def test_config_mass_overrides_drone(self):
+        d = Drone(0, 0.0, 0.0, max_speed=5.0, mass=2.0)
+        cfg = PhysicsConfig(dt=0.1, max_accel=10.0, mass=4.0)
+        physics_step(d, 100.0, 0.0, 0.0, cfg)
+        # config.mass=4.0 生效，加速度更小
+        assert abs(d.vx) < 1.0
+
+    def test_drone_mass_wins_when_config_default(self):
+        d = Drone(0, 0.0, 0.0, max_speed=5.0, mass=10.0)
+        cfg = PhysicsConfig(dt=0.1, max_accel=10.0)  # mass 默认 1.0
+        physics_step(d, 100.0, 0.0, 0.0, cfg)
+        # drone.mass=10.0 生效
+        assert abs(d.vx) < 0.2
+
+    def test_config_drag_overrides_drone(self):
+        d = Drone(0, 0.0, 0.0, drag=0.1)
+        d.vx = 10.0
+        cfg = PhysicsConfig(dt=0.1, drag=2.0)  # 显式传入
+        physics_step(d, 100.0, 0.0, 0.0, cfg)
+        # config.drag=2.0 生效 → 强阻力
+        assert d.vx < 5.0
+
+    def test_drone_drag_wins_when_config_default(self):
+        d = Drone(0, 0.0, 0.0, drag=0.8)
+        d.vx = 10.0
+        cfg = PhysicsConfig(dt=0.1)  # drag 默认 0.0
+        physics_step(d, 100.0, 0.0, 0.0, cfg)
+        # drone.drag=0.8 生效
+        assert d.vx < 10.0
+
+    def test_config_accel_overrides_drone(self):
+        d = Drone(0, 0.0, 0.0, max_speed=10.0, max_accel=50.0)
+        cfg = PhysicsConfig(dt=0.1, max_accel=2.0)  # 显式传入
+        physics_step(d, 100.0, 0.0, 0.0, cfg)
+        # config.max_accel=2.0 生效，单步最大速度增量 2*0.1=0.2
+        assert abs(d.vx) <= 0.21
+
+
+class TestPhysicsEdgeCases:
+    """物理引擎边界情况测试。"""
+
+    def test_tiny_dist_nonzero_speed(self):
+        """距离极小 (< 1e-9) 但速度非零时，速度清零并返回 True。"""
+        d = Drone(0, 5.0, 0.0, max_speed=float("inf"))
+        d.vx = 3.0
+        d.vy = 1.0
+        cfg = PhysicsConfig()
+        arrived = physics_step(d, 5.0000000001, 0.0, 0.0, cfg)
+        assert arrived is True
+        assert d.vx == 0.0
+        assert d.vy == 0.0

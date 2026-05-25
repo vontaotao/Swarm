@@ -33,7 +33,7 @@ src/
 ├── physics.py             # 轻量动力学引擎（欧拉积分）
 ├── collision.py           # 碰撞检测与规避
 └── hardware.py            # 硬件抽象接口（MAVLink/ROS 预留）
-tests/                     # 124 项单元测试
+tests/                     # 139 项单元测试
 docs/planning/             # 项目规划文档
 ```
 
@@ -41,7 +41,7 @@ docs/planning/             # 项目规划文档
 
 ```bash
 pip install numpy pytest matplotlib
-python -m pytest tests/ -v   # 124 项测试
+python -m pytest tests/ -v   # 139 项测试
 ```
 
 ```python
@@ -81,7 +81,8 @@ render_gif(traj, seq, 'swarm_physics.gif', fps=8)
 - [x] 里程碑 2：动态快照序列 + matplotlib 可视化 + 速度约束
 - [x] 里程碑 3：3D 扩展 + 通信模型 + 去中心化
 - [x] 里程碑 4：轻量动力学 + 碰撞检测 + 硬件抽象接口
-- [ ] 里程碑 5：待规划
+- [x] 里程碑 5：工程质量夯实（bug 修复 + 参数暴露 + 139 项测试）
+- [ ] 里程碑 6：待规划
 
 详见 `docs/planning/PROJECT_STATUS.md`
 

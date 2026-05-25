@@ -166,3 +166,12 @@ class TestDronePhysics:
         d = Drone(0, 0.0, 0.0)
         d.set_target(7.0, 8.0)
         assert d._target == (7.0, 8.0, 0.0)
+
+
+class TestDroneEdgeCases:
+    def test_max_speed_zero_cannot_move(self):
+        """max_speed=0 时 move_toward 不改变位置。"""
+        d = Drone(0, 5.0, 5.0, max_speed=0.0)
+        arrived = d.move_toward(10.0, 10.0)
+        assert arrived is False
+        assert d.position == (5.0, 5.0, 0.0)
