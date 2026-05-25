@@ -1,21 +1,26 @@
 """
 # 1. 功能
-无人机个体模块。定义单架无人机的状态（ID、三维位置）和基本行为（距离计算、移动）。
+无人机个体模块。定义单架无人机的状态（ID、三维位置、速度、物理参数）和基本行为（距离计算、移动）。
 2D 场景 z 默认为 0，不影响现有调用。
 
 # 2. 输入
 - drone_id: 无人机唯一标识
 - x, y, z: 初始坐标（z 默认 0.0）
 - max_speed: 每时间步最大移动距离（默认 inf = 无限制）
+- max_accel: 最大加速度（默认 inf = 无限制）
+- drag: 阻力系数（默认 0.0）
+- mass: 质量（默认 1.0）
 
 # 3. 输出
 - 自身状态信息，position 始终返回 (x, y, z) 三元组
+- velocity 属性返回 (vx, vy, vz) 速度三元组
 
 # 4. 核心执行流程
-- 初始化时记录 ID、三维位置、速度上限
+- 初始化时记录 ID、三维位置、速度上限、物理参数
 - distance_to(tx, ty, tz): 计算欧几里得距离
 - move_to(tx, ty, tz): 瞬时移动
-- move_toward(tx, ty, tz): 向目标移动一步，受 max_speed 约束
+- move_toward(tx, ty, tz): 向目标移动一步，受 max_speed 约束（纯运动学，不修改速度状态）
+- set_target(tx, ty, tz): 记录目标位置，供物理引擎使用
 
 # 5. 依赖
 - math
@@ -27,16 +32,32 @@ import math
 class Drone:
     """单架无人机，支持 2D/3D 空间。"""
 
-    def __init__(self, drone_id: int, x: float, y: float, z: float = 0.0, max_speed: float = float("inf")):
+    def __init__(self, drone_id: int, x: float, y: float, z: float = 0.0, max_speed: float = float("inf"),
+                 max_accel: float = float("inf"), drag: float = 0.0, mass: float = 1.0):
         self.id = drone_id
         self.x = float(x)
         self.y = float(y)
         self.z = float(z)
         self.max_speed = float(max_speed)
+        self.max_accel = float(max_accel)
+        self.drag = float(drag)
+        self.mass = float(mass)
+        self.vx: float = 0.0
+        self.vy: float = 0.0
+        self.vz: float = 0.0
+        self._target: tuple[float, float, float] | None = None
 
     @property
     def position(self) -> tuple[float, float, float]:
         return (self.x, self.y, self.z)
+
+    @property
+    def velocity(self) -> tuple[float, float, float]:
+        return (self.vx, self.vy, self.vz)
+
+    def set_target(self, tx: float, ty: float, tz: float = 0.0) -> None:
+        """记录目标位置，供物理引擎使用。"""
+        self._target = (float(tx), float(ty), float(tz))
 
     def distance_to(self, tx: float, ty: float, tz: float = 0.0) -> float:
         """计算当前位置到目标点 (tx, ty, tz) 的欧几里得距离。"""

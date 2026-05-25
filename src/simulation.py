@@ -7,11 +7,17 @@
 - 集中式（mode="centralized"）：使用 matcher.match() 全局匹配
 - 去中心化（mode="distributed"）：无人机通过通信协商完成补位
 
+可选物理模式（use_physics=True）：每子步使用欧拉积分替代纯运动学移动。
+
 # 2. 输入
 - snapshots: 快照列表
 - n_drones: 无人机数量
 - mode: "centralized" 或 "distributed"
 - comm_radius: 通信半径（distributed 模式）
+- use_physics: 是否启用动力学（速度/加速度/阻力）
+- physics_dt: 物理时间步长
+- max_accel: 最大加速度
+- drag: 阻力系数
 
 # 3. 输出
 - trajectory: list[list[(x, y, z)]]
@@ -19,13 +25,13 @@
 # 4. 核心执行流程
 1. 初始化无人机群（随机散布）
 2. 循环每时间步：
-   a. centralized: match + move_toward 内层循环
+   a. centralized: match + (physics_step | move_toward) 内层循环
    b. distributed: distributed_match 协商循环
    c. 记录轨迹
 
 # 5. 依赖
 - numpy, random
-- src.drone, src.matcher, src.comm, src.distributed_matcher
+- src.drone, src.matcher, src.comm, src.distributed_matcher, src.physics
 """
 
 import random
@@ -35,6 +41,8 @@ from src.drone import Drone
 from src.matcher import match
 from src.comm import CommNetwork
 from src.distributed_matcher import distributed_match
+from src.physics import PhysicsConfig, physics_step
+from src.collision import avoid_collisions
 
 _MAX_SUB_STEPS = 200
 
@@ -44,6 +52,8 @@ def _init_drones(
     shape: tuple[int, ...],
     seed: int = 0,
     max_speed: float = float("inf"),
+    max_accel: float = float("inf"),
+    drag: float = 0.0,
 ) -> list[Drone]:
     """在网格内随机散布 n 架无人机。
 
@@ -57,14 +67,14 @@ def _init_drones(
         for i in range(n):
             drones.append(Drone(i, rng.uniform(0, width - 1),
                                  rng.uniform(0, height - 1),
-                                 max_speed=max_speed))
+                                 max_speed=max_speed, max_accel=max_accel, drag=drag))
     else:
         depth, height, width = shape
         for i in range(n):
             drones.append(Drone(i, rng.uniform(0, width - 1),
                                  rng.uniform(0, height - 1),
                                  rng.uniform(0, depth - 1),
-                                 max_speed=max_speed))
+                                 max_speed=max_speed, max_accel=max_accel, drag=drag))
     return drones
 
 
@@ -76,6 +86,13 @@ def run(
     max_speed: float = float("inf"),
     mode: str = "centralized",
     comm_radius: float = float("inf"),
+    use_physics: bool = False,
+    physics_dt: float = 0.1,
+    max_accel: float = float("inf"),
+    drag: float = 0.0,
+    collision_avoidance: bool = False,
+    min_distance: float = 1.0,
+    repulsion_strength: float = 1.0,
 ) -> list[list[tuple[float, float, float]]]:
     """运行多时间步仿真。
 
@@ -87,6 +104,13 @@ def run(
         max_speed: 最大移动速度
         mode: "centralized" 或 "distributed"
         comm_radius: 通信半径（distributed 模式使用）
+        use_physics: 是否启用动力学引擎
+        physics_dt: 物理时间步长
+        max_accel: 最大加速度
+        drag: 阻力系数
+        collision_avoidance: 是否启用碰撞规避
+        min_distance: 最小安全距离
+        repulsion_strength: 排斥力强度
 
     Returns:
         trajectory[t][i] = 第 t 步第 i 架无人机的 (x, y, z)
@@ -95,7 +119,9 @@ def run(
         return []
 
     shape = snapshots[0].shape
-    drones = _init_drones(n_drones, shape, seed, max_speed=max_speed)
+    drones = _init_drones(n_drones, shape, seed, max_speed=max_speed,
+                           max_accel=max_accel, drag=drag)
+    phys_cfg = PhysicsConfig(dt=physics_dt, max_accel=max_accel, drag=drag)
 
     if mode == "distributed":
         comm = CommNetwork(comm_radius=comm_radius)
@@ -113,15 +139,27 @@ def run(
                 for d, target in zip(drones, targets):
                     tx, ty = target[0], target[1]
                     tz = target[2] if len(target) > 2 else 0.0
-                    arrived = d.move_toward(tx, ty, tz)
+                    if use_physics:
+                        d.set_target(tx, ty, tz)
+                        arrived = physics_step(d, tx, ty, tz, phys_cfg)
+                    else:
+                        arrived = d.move_toward(tx, ty, tz)
                     if not arrived:
                         any_moving = True
+
+                if collision_avoidance:
+                    avoid_collisions(drones, min_distance, repulsion_strength)
 
                 if not any_moving:
                     break
         else:
             # --- 去中心化：通信协商 ---
-            distributed_match(snapshot, drones, comm)
+            distributed_match(snapshot, drones, comm,
+                              use_physics=use_physics, physics_dt=physics_dt,
+                              max_accel=max_accel, drag=drag,
+                              collision_avoidance=collision_avoidance,
+                              min_distance=min_distance,
+                              repulsion_strength=repulsion_strength)
 
         step_positions = [d.position for d in drones]
         trajectory.append(step_positions)

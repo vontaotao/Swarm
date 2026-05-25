@@ -133,3 +133,36 @@ class TestDroneRepr:
         assert "7" in r
         assert "1.5" in r
         assert "2.5" in r
+
+
+class TestDronePhysics:
+    def test_default_physics_params(self):
+        d = Drone(0, 0.0, 0.0)
+        assert d.max_accel == float("inf")
+        assert d.drag == 0.0
+        assert d.mass == 1.0
+        assert d.vx == 0.0 and d.vy == 0.0 and d.vz == 0.0
+
+    def test_physics_params_in_init(self):
+        d = Drone(1, 1.0, 2.0, 3.0, max_accel=5.0, drag=0.1, mass=2.0)
+        assert d.max_accel == 5.0
+        assert d.drag == 0.1
+        assert d.mass == 2.0
+
+    def test_velocity_property(self):
+        d = Drone(0, 0.0, 0.0)
+        assert d.velocity == (0.0, 0.0, 0.0)
+        d.vx = 3.0
+        d.vy = -1.0
+        d.vz = 2.5
+        assert d.velocity == (3.0, -1.0, 2.5)
+
+    def test_set_target(self):
+        d = Drone(0, 0.0, 0.0)
+        d.set_target(10.0, 20.0, 5.0)
+        assert d._target == (10.0, 20.0, 5.0)
+
+    def test_set_target_2d_default_z(self):
+        d = Drone(0, 0.0, 0.0)
+        d.set_target(7.0, 8.0)
+        assert d._target == (7.0, 8.0, 0.0)

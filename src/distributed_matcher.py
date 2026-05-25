@@ -3,14 +3,20 @@
 去中心化匹配算法模块。不使用中央 matcher，无人机通过通信网络
 交换声明消息，自主协商完成到目标快照的补位分配。
 
+可选物理模式（use_physics=True）：移动阶段使用欧拉积分替代纯运动学。
+
 # 2. 输入
 - snapshot: 布尔网格 (np.ndarray)
 - drones: Drone 列表
 - comm: CommNetwork 实例
-- max_rounds: 每时间步最多协商轮数
+- max_rounds: 每时间步最多协商数
+- use_physics: 是否启用动力学
+- physics_dt: 物理时间步长
+- max_accel: 最大加速度
+- drag: 阻力系数
 
 # 3. 输出
-- 直接修改各无人机的目标位置（内部调用 move_toward）
+- 直接修改各无人机的目标位置（内部调用 move_toward 或 physics_step）
 
 # 4. 核心执行流程
 每轮（sub-step）：
@@ -19,18 +25,20 @@
   3. 从通信消息中收集所有已声明的空缺
   4. 未分配无人机找最近未被声明的空缺 → 广播 CLAIM
   5. 冲突解决：同一空缺多人声明 → 距离最近者胜，失败者下轮重试
-  6. 无人机向各自声明目标 move_toward
+  6. 无人机向各自声明目标 move_toward / physics_step
   7. 收敛判断：所有无人机已到达目标 或 无新声明产生
 
 # 5. 依赖
 - numpy
-- src.drone, src.comm, src.matcher（复用 _vacancies_from_snapshot）
+- src.drone, src.comm, src.matcher（复用 _vacancies_from_snapshot）, src.physics
 """
 
 import numpy as np
 from src.drone import Drone
 from src.comm import CommNetwork
 from src.matcher import _vacancies_from_snapshot, _pixel_at, _sq_dist
+from src.physics import PhysicsConfig, physics_step
+from src.collision import avoid_collisions
 
 _MAX_ROUNDS = 100
 
@@ -40,16 +48,27 @@ def distributed_match(
     drones: list[Drone],
     comm: CommNetwork,
     max_rounds: int = _MAX_ROUNDS,
+    use_physics: bool = False,
+    physics_dt: float = 0.1,
+    max_accel: float = float("inf"),
+    drag: float = 0.0,
+    collision_avoidance: bool = False,
+    min_distance: float = 1.0,
+    repulsion_strength: float = 1.0,
 ) -> None:
     """执行一个时间步的去中心化匹配，无人机通过通信协商补位。
 
-    直接修改 drones 的位置（通过 move_toward）。
+    直接修改 drones 的位置（通过 move_toward 或 physics_step）。
 
     Args:
         snapshot: 目标快照
         drones: 无人机列表
         comm: 已初始化的通信网络
         max_rounds: 最大协商轮数
+        use_physics: 是否启用动力学引擎
+        physics_dt: 物理时间步长
+        max_accel: 最大加速度
+        drag: 阻力系数
     """
     n = len(drones)
     if n == 0:
@@ -58,6 +77,8 @@ def distributed_match(
     all_vacancies = _vacancies_from_snapshot(snapshot)
     if not all_vacancies:
         return
+
+    phys_cfg = PhysicsConfig(dt=physics_dt, max_accel=max_accel, drag=drag)
 
     # 每架无人机的当前声明目标
     claims: dict[int, tuple[int, ...] | None] = {}  # drone_id -> pixel or None
@@ -157,13 +178,22 @@ def distributed_match(
         for d in drones:
             if d.id in claims and claims[d.id] is not None:
                 target = claims[d.id]
-                arrived = d.move_toward(float(target[0]), float(target[1]),
-                                         float(target[2]) if len(target) > 2 else 0.0)
+                tx = float(target[0])
+                ty = float(target[1])
+                tz = float(target[2]) if len(target) > 2 else 0.0
+                if use_physics:
+                    d.set_target(tx, ty, tz)
+                    arrived = physics_step(d, tx, ty, tz, phys_cfg)
+                else:
+                    arrived = d.move_toward(tx, ty, tz)
                 if not arrived:
                     any_moving = True
             else:
                 # 无声明 → 本轮不动
                 pass
+
+        if collision_avoidance:
+            avoid_collisions(drones, min_distance, repulsion_strength)
 
         # --- 阶段 6: 收敛判断 ---
         if not any_moving:
@@ -173,6 +203,11 @@ def distributed_match(
                 if _pixel_at(d.position) not in all_vacancies:
                     all_arrived = False
                     break
+                if use_physics:
+                    speed = (d.vx * d.vx + d.vy * d.vy + d.vz * d.vz) ** 0.5
+                    if speed > 1e-6:
+                        all_arrived = False
+                        break
             if all_arrived:
                 break
 

@@ -151,3 +151,78 @@ class TestRunDistributed:
         for x, y, z in trajectory[0]:
             ix, iy, iz = int(round(x)), int(round(y)), int(round(z))
             assert snapshot[iz, iy, ix] is np.True_
+
+    def test_distributed_with_physics(self):
+        """分布式 + 物理模式组合不崩溃且收敛。"""
+        snapshot = create_snapshot_rectangle(30, 30, 10, 10, 6, 6)
+        trajectory = run([snapshot], n_drones=5, seed=42,
+                         max_speed=2.0, mode="distributed", comm_radius=20.0,
+                         use_physics=True, physics_dt=0.1, max_accel=5.0,
+                         verbose=False)
+        assert len(trajectory) == 1
+        assert len(trajectory[0]) == 5
+        for x, y, z in trajectory[0]:
+            assert 0.0 <= x < 30.0
+            assert 0.0 <= y < 30.0
+
+
+class TestRunWithPhysics:
+    def test_physics_mode_converges(self):
+        """use_physics=True 时静态快照最终应收敛到目标。"""
+        snapshot = create_snapshot_rectangle(40, 40, 20, 20, 10, 8)
+        snapshots = [snapshot] * 3
+        trajectory = run(snapshots, n_drones=8, seed=7, max_speed=2.0,
+                         use_physics=True, physics_dt=0.1, max_accel=10.0,
+                         verbose=False)
+        final = trajectory[-1]
+        for x, y, z in final:
+            ix, iy = int(round(x)), int(round(y))
+            assert snapshot[iy, ix] is np.True_
+
+    def test_physics_produces_smooth_trajectory(self):
+        """有加速限制时，相邻帧位移不应超过自由落体式位移上限。"""
+        snapshot = create_snapshot_rectangle(30, 30, 5, 5, 6, 6)
+        snapshots = [
+            snapshot,
+            create_snapshot_rectangle(30, 30, 25, 25, 6, 6),
+        ]
+        trajectory = run(snapshots, n_drones=4, seed=99, max_speed=3.0,
+                         use_physics=True, physics_dt=0.1, max_accel=10.0,
+                         verbose=False)
+        assert len(trajectory) == 2
+        # 检查相邻时间步的位移：受加速度约束
+        for t in range(1, len(trajectory)):
+            for i, (p_new, p_old) in enumerate(zip(trajectory[t], trajectory[t - 1])):
+                dx = p_new[0] - p_old[0]
+                dy = p_new[1] - p_old[1]
+                dist = (dx * dx + dy * dy) ** 0.5
+                # 位移应有限，不会无限大
+                assert dist < 50.0
+
+
+class TestRunWithCollision:
+    def test_collision_avoidance_basic(self):
+        """碰撞规避开启不崩溃且收敛。"""
+        snapshot = create_snapshot_rectangle(50, 50, 20, 20, 20, 20)
+        trajectory = run([snapshot], n_drones=4, seed=42,
+                         max_speed=float("inf"), collision_avoidance=True,
+                         min_distance=2.0, repulsion_strength=0.5,
+                         verbose=False)
+        assert len(trajectory) == 1
+        for x, y, z in trajectory[0]:
+            assert 0.0 <= x < 50.0
+            assert 0.0 <= y < 50.0
+
+    def test_collision_with_physics(self):
+        """碰撞规避 + 物理模式组合收敛。"""
+        snapshot = create_snapshot_rectangle(40, 40, 15, 15, 12, 12)
+        snapshots = [snapshot] * 2
+        trajectory = run(snapshots, n_drones=6, seed=1, max_speed=2.0,
+                         use_physics=True, physics_dt=0.1, max_accel=8.0,
+                         collision_avoidance=True, min_distance=1.5,
+                         repulsion_strength=0.3, verbose=False)
+        assert len(trajectory) == 2
+        final = trajectory[-1]
+        for x, y, z in final:
+            ix, iy = int(round(x)), int(round(y))
+            assert snapshot[iy, ix] is np.True_

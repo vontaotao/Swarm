@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-**里程碑 3: 三维扩展 + 通信模型 + 去中心化** — 已实现。
+**里程碑 4: 轻量动力学 + 碰撞检测 + 硬件抽象** — 已实现。
 
 ## 已完成
 
@@ -23,18 +23,30 @@
 - [x] `src/visualizer.py` — 3D 切片投影渲染（slice_z 参数）
 - [x] 全部 83 项测试通过
 
+### 里程碑 4: 轻量动力学 + 碰撞检测 + 硬件抽象
+- [x] `src/drone.py` — 新增 vx/vy/vz 速度状态、max_accel/drag/mass 物理参数、set_target()
+- [x] `src/physics.py` — 轻量动力学引擎（PhysicsConfig + physics_step，纯 Python 欧拉积分）
+- [x] `src/hardware.py` — 硬件抽象接口（HardwareInterface ABC + SimulatedDrone）
+- [x] `src/collision.py` — 碰撞检测与规避（detect + repulsion + avoid）
+- [x] `src/simulation.py` — 新增 use_physics / collision_avoidance 等参数
+- [x] `src/distributed_matcher.py` — 支持物理模式和碰撞规避
+- [x] 全部 124 项测试通过
+
 ## 下一步
 
-- 里程碑 4 规划：硬件接口（MAVLink / ROS）
-- 当前可执行 `python -m pytest tests/ -v` 验证全部测试
-- 3D 端到端示例：
+- 里程碑 5：待规划
+- 当前可执行 `python -m pytest tests/ -v` 验证全部测试（124 项）
+- 物理模式端到端示例：
   ```python
-  from src.grid import create_snapshot_sphere
+  from src.choreographer import generate_sequence
   from src.simulation import run
   from src.visualizer import render_gif
-  seq = [create_snapshot_sphere(30, 40, 15, 10+i*2, 20, 8, 6) for i in range(20)]
-  traj = run(seq, n_drones=25, max_speed=2.0, mode='distributed', comm_radius=20.0)
-  render_gif(traj, seq, 'swarm3d.gif', fps=6, slice_z=8)
+
+  seq = generate_sequence(60, 60, 30, 'circle_shift', radius=6)
+  traj = run(seq, n_drones=15, max_speed=2.5, seed=42,
+             use_physics=True, physics_dt=0.1, max_accel=5.0,
+             collision_avoidance=True, min_distance=1.5)
+  render_gif(traj, seq, 'swarm_physics.gif', fps=8)
   ```
 
 ## 风险
